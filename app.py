@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash
 import pandas as pd
 import sqlite3
 import json
@@ -8,19 +8,11 @@ from pyvis.network import Network
 import ast
 
 app = Flask(__name__)
+app.secret_key = "supersecretkey"
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['ALLOWED_EXTENSIONS'] = {'xlsx'}
 
 # Nom du fichier JSON contenant les noms des nombres quantiques
 QNAMES_FILE = 'Qnames.json'
-
-# Créer le dossier uploads s'il n'existe pas
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
-
-# Fonction pour vérifier l'extension des fichiers
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 # Fonction pour charger les noms des nombres quantiques
 def load_quantum_names():
@@ -48,29 +40,52 @@ def convert_to_json(quantum_numbers_str):
         print(f"Erreur : Impossible de convertir '{quantum_numbers_str}' en nombres quantiques.")
         return json.dumps([])
 
-# Route pour la page d'accueil
+# Fonction pour créer la table transitions si elle n'existe pas
+def create_transitions_table():
+    conn = sqlite3.connect('marvel.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS transitions (
+            id INTEGER PRIMARY KEY,
+            wavenumber REAL,
+            uncertainty REAL,
+            quantum_numbers_up TEXT,
+            quantum_numbers_low TEXT,
+            line_status INTEGER,
+            src_status INTEGER,
+            src TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Route pour la page d'accueil (téléversement de fichiers)
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    show_graph_button = False  # Par défaut, le bouton est caché
+
     if request.method == 'POST':
-        # Vérifier si un fichier a été téléversé
         if 'file' not in request.files:
+            flash("Aucun fichier sélectionné.", "error")
             return redirect(request.url)
+
         file = request.files['file']
         if file.filename == '':
+            flash("Aucun fichier sélectionné.", "error")
             return redirect(request.url)
-        if file and allowed_file(file.filename):
-            # Sauvegarder le fichier téléversé
-            filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-            file.save(filename)
 
-            # Charger les données du fichier Excel
-            df = pd.read_excel(filename)
+        if file and file.filename.endswith('.xlsx'):
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            file.save(filepath)
 
-            # Se connecter à la base de données
+            # Charger les données Excel
+            df = pd.read_excel(filepath)
+
+            # Connexion à la base de données
             conn = sqlite3.connect('marvel.db')
             cursor = conn.cursor()
 
-            # Insérer les données dans la base de données
+            # Insérer les données dans la table transitions
             for index, row in df.iterrows():
                 id_value = row.get('id')
                 wavenumber = row['wavenumber']
@@ -92,24 +107,33 @@ def index():
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                     ''', (wavenumber, uncertainty, quantum_numbers_up, quantum_numbers_low, line_status, src_status, src))
 
-            # Sauvegarder et fermer la connexion
             conn.commit()
             conn.close()
+            flash("Données insérées avec succès !", "success")
+            show_graph_button = True  # Afficher le bouton après un téléversement réussi
+            return render_template('index.html', show_graph_button=show_graph_button)
 
-            return redirect(url_for('index'))
-    return render_template('index.html')
+        else:
+            flash("Format de fichier non supporté. Veuillez téléverser un fichier Excel (.xlsx).", "error")
+            return redirect(request.url)
 
-# Route pour générer le graphe
-@app.route('/generate_graph', methods=['GET'])
-def generate_graph():
-    # Se connecter à la base de données
-    conn = sqlite3.connect('marvel.db')
+    return render_template('index.html', show_graph_button=show_graph_button)
+
+# Route pour afficher le graphe et les informations
+@app.route('/graph')
+def graph():
+    # Connexion à la base de données
+    conn = sqlite3.connect("marvel.db")
     cursor = conn.cursor()
 
     # Récupérer les transitions
     cursor.execute("SELECT id, wavenumber, quantum_numbers_up, quantum_numbers_low FROM transitions")
     transitions = cursor.fetchall()
     conn.close()
+
+    if not transitions:
+        flash("Aucune transition trouvée dans la base de données.", "error")
+        return redirect(url_for('index'))
 
     # Créer un graphe orienté
     G = nx.DiGraph()
@@ -139,70 +163,26 @@ def generate_graph():
 
         G.add_edge(quantum_numbers_low_str, quantum_numbers_up_str, weight=wavenumber, id=id_transition)
 
-    # Générer le graphe avec PyVis
+    # Nombre de composantes connexes
+    composantes_connexes = list(nx.weakly_connected_components(G))
+    nombre_composantes = len(composantes_connexes)
+
+    # Générer le graphe PyVis
     net = Network(notebook=True, directed=True, cdn_resources='remote')
     for nœud, données in G.nodes(data=True):
         net.add_node(nœud, label=données.get("label", nœud))
     for départ, arrivée, données in G.edges(data=True):
-        wavenumber = données["weight"]
-        id_transition = données["id"]
-        net.add_edge(départ, arrivée, value=wavenumber, title=f"Transition {id_transition}\nWavenumber: {wavenumber}")
+        net.add_edge(départ, arrivée, value=données["weight"], title=f"Transition {données['id']}\nWavenumber: {données['weight']}")
 
-    # Sauvegarder le graphe en HTML
-    net.write_html('templates/graph.html')
+    net.write_html("templates/graph.html")
 
-    return redirect(url_for('show_graph'))
-
-# Route pour afficher le graphe
-@app.route('/graph')
-def show_graph():
-    return render_template('graph.html')
-
-# Route pour afficher le nombre de composantes connexes
-@app.route('/components')
-def show_components():
-    # Se connecter à la base de données
-    conn = sqlite3.connect('marvel.db')
-    cursor = conn.cursor()
-
-    # Récupérer les transitions
-    cursor.execute("SELECT quantum_numbers_up, quantum_numbers_low FROM transitions")
-    transitions = cursor.fetchall()
-    conn.close()
-
-    # Créer un graphe orienté
-    G = nx.DiGraph()
-
-    # Ajouter les transitions au graphe
-    for transition in transitions:
-        quantum_numbers_up, quantum_numbers_low = transition
-
-        try:
-            quantum_numbers_low = ast.literal_eval(quantum_numbers_low)
-            quantum_numbers_up = ast.literal_eval(quantum_numbers_up)
-
-            if isinstance(quantum_numbers_low, list):
-                quantum_numbers_low = tuple(quantum_numbers_low)
-            if isinstance(quantum_numbers_up, list):
-                quantum_numbers_up = tuple(quantum_numbers_up)
-        except (ValueError, SyntaxError):
-            pass
-
-        quantum_numbers_low_str = str(quantum_numbers_low)
-        quantum_numbers_up_str = str(quantum_numbers_up)
-
-        if quantum_numbers_low_str not in G:
-            G.add_node(quantum_numbers_low_str, label=quantum_numbers_low_str)
-        if quantum_numbers_up_str not in G:
-            G.add_node(quantum_numbers_up_str, label=quantum_numbers_up_str)
-
-        G.add_edge(quantum_numbers_low_str, quantum_numbers_up_str)
-
-    # Calculer le nombre de composantes connexes
-    composantes_connexes = list(nx.weakly_connected_components(G))
-    nombre_composantes = len(composantes_connexes)
-
-    return render_template('components.html', nombre_composantes=nombre_composantes)
+    return render_template('graph.html', nombre_composantes=nombre_composantes)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
+    
+    # Créer la table transitions si elle n'existe pas
+    create_transitions_table()
+    
+    app.run(debug=True, port=5001)  # Changer le port si nécessaire

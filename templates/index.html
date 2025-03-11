@@ -9,9 +9,16 @@
 <body>
     <h1>Téléverser un fichier Excel</h1>
     <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".xlsx">
+        <input type="file" name="file" accept=".xlsx" required>
         <button type="submit">Téléverser</button>
     </form>
+
+    <!-- Bouton pour afficher le réseau spectroscopique -->
+    {% if show_graph_button %}
+        <a href="{{ url_for('graph') }}" class="button">Afficher le réseau spectroscopique</a>
+    {% endif %}
+
+    <!-- Messages flash -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}

@@ -1,0 +1,364 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script>function neighbourhoodHighlight(params) {
+  // console.log("in nieghbourhoodhighlight");
+  allNodes = nodes.get({ returnType: "Object" });
+  // originalNodes = JSON.parse(JSON.stringify(allNodes));
+  // if something is selected:
+  if (params.nodes.length > 0) {
+    highlightActive = true;
+    var i, j;
+    var selectedNode = params.nodes[0];
+    var degrees = 2;
+
+    // mark all nodes as hard to read.
+    for (let nodeId in allNodes) {
+      // nodeColors[nodeId] = allNodes[nodeId].color;
+      allNodes[nodeId].color = "rgba(200,200,200,0.5)";
+      if (allNodes[nodeId].hiddenLabel === undefined) {
+        allNodes[nodeId].hiddenLabel = allNodes[nodeId].label;
+        allNodes[nodeId].label = undefined;
+      }
+    }
+    var connectedNodes = network.getConnectedNodes(selectedNode);
+    var allConnectedNodes = [];
+
+    // get the second degree nodes
+    for (i = 1; i < degrees; i++) {
+      for (j = 0; j < connectedNodes.length; j++) {
+        allConnectedNodes = allConnectedNodes.concat(
+          network.getConnectedNodes(connectedNodes[j])
+        );
+      }
+    }
+
+    // all second degree nodes get a different color and their label back
+    for (i = 0; i < allConnectedNodes.length; i++) {
+      // allNodes[allConnectedNodes[i]].color = "pink";
+      allNodes[allConnectedNodes[i]].color = "rgba(150,150,150,0.75)";
+      if (allNodes[allConnectedNodes[i]].hiddenLabel !== undefined) {
+        allNodes[allConnectedNodes[i]].label =
+          allNodes[allConnectedNodes[i]].hiddenLabel;
+        allNodes[allConnectedNodes[i]].hiddenLabel = undefined;
+      }
+    }
+
+    // all first degree nodes get their own color and their label back
+    for (i = 0; i < connectedNodes.length; i++) {
+      // allNodes[connectedNodes[i]].color = undefined;
+      allNodes[connectedNodes[i]].color = nodeColors[connectedNodes[i]];
+      if (allNodes[connectedNodes[i]].hiddenLabel !== undefined) {
+        allNodes[connectedNodes[i]].label =
+          allNodes[connectedNodes[i]].hiddenLabel;
+        allNodes[connectedNodes[i]].hiddenLabel = undefined;
+      }
+    }
+
+    // the main node gets its own color and its label back.
+    // allNodes[selectedNode].color = undefined;
+    allNodes[selectedNode].color = nodeColors[selectedNode];
+    if (allNodes[selectedNode].hiddenLabel !== undefined) {
+      allNodes[selectedNode].label = allNodes[selectedNode].hiddenLabel;
+      allNodes[selectedNode].hiddenLabel = undefined;
+    }
+  } else if (highlightActive === true) {
+    // console.log("highlightActive was true");
+    // reset all nodes
+    for (let nodeId in allNodes) {
+      // allNodes[nodeId].color = "purple";
+      allNodes[nodeId].color = nodeColors[nodeId];
+      // delete allNodes[nodeId].color;
+      if (allNodes[nodeId].hiddenLabel !== undefined) {
+        allNodes[nodeId].label = allNodes[nodeId].hiddenLabel;
+        allNodes[nodeId].hiddenLabel = undefined;
+      }
+    }
+    highlightActive = false;
+  }
+
+  // transform the object into an array
+  var updateArray = [];
+  if (params.nodes.length > 0) {
+    for (let nodeId in allNodes) {
+      if (allNodes.hasOwnProperty(nodeId)) {
+        // console.log(allNodes[nodeId]);
+        updateArray.push(allNodes[nodeId]);
+      }
+    }
+    nodes.update(updateArray);
+  } else {
+    // console.log("Nothing was selected");
+    for (let nodeId in allNodes) {
+      if (allNodes.hasOwnProperty(nodeId)) {
+        // console.log(allNodes[nodeId]);
+        // allNodes[nodeId].color = {};
+        updateArray.push(allNodes[nodeId]);
+      }
+    }
+    nodes.update(updateArray);
+  }
+}
+
+function filterHighlight(params) {
+  allNodes = nodes.get({ returnType: "Object" });
+  // if something is selected:
+  if (params.nodes.length > 0) {
+    filterActive = true;
+    let selectedNodes = params.nodes;
+
+    // hiding all nodes and saving the label
+    for (let nodeId in allNodes) {
+      allNodes[nodeId].hidden = true;
+      if (allNodes[nodeId].savedLabel === undefined) {
+        allNodes[nodeId].savedLabel = allNodes[nodeId].label;
+        allNodes[nodeId].label = undefined;
+      }
+    }
+
+    for (let i=0; i < selectedNodes.length; i++) {
+      allNodes[selectedNodes[i]].hidden = false;
+      if (allNodes[selectedNodes[i]].savedLabel !== undefined) {
+        allNodes[selectedNodes[i]].label = allNodes[selectedNodes[i]].savedLabel;
+        allNodes[selectedNodes[i]].savedLabel = undefined;
+      }
+    }
+
+  } else if (filterActive === true) {
+    // reset all nodes
+    for (let nodeId in allNodes) {
+      allNodes[nodeId].hidden = false;
+      if (allNodes[nodeId].savedLabel !== undefined) {
+        allNodes[nodeId].label = allNodes[nodeId].savedLabel;
+        allNodes[nodeId].savedLabel = undefined;
+      }
+    }
+    filterActive = false;
+  }
+
+  // transform the object into an array
+  var updateArray = [];
+  if (params.nodes.length > 0) {
+    for (let nodeId in allNodes) {
+      if (allNodes.hasOwnProperty(nodeId)) {
+        updateArray.push(allNodes[nodeId]);
+      }
+    }
+    nodes.update(updateArray);
+  } else {
+    for (let nodeId in allNodes) {
+      if (allNodes.hasOwnProperty(nodeId)) {
+        updateArray.push(allNodes[nodeId]);
+      }
+    }
+    nodes.update(updateArray);
+  }
+}
+
+function selectNode(nodes) {
+  network.selectNodes(nodes);
+  neighbourhoodHighlight({ nodes: nodes });
+  return nodes;
+}
+
+function selectNodes(nodes) {
+  network.selectNodes(nodes);
+  filterHighlight({nodes: nodes});
+  return nodes;
+}
+
+function highlightFilter(filter) {
+  let selectedNodes = []
+  let selectedProp = filter['property']
+  if (filter['item'] === 'node') {
+    let allNodes = nodes.get({ returnType: "Object" });
+    for (let nodeId in allNodes) {
+      if (allNodes[nodeId][selectedProp] && filter['value'].includes((allNodes[nodeId][selectedProp]).toString())) {
+        selectedNodes.push(nodeId)
+      }
+    }
+  }
+  else if (filter['item'] === 'edge'){
+    let allEdges = edges.get({returnType: 'object'});
+    // check if the selected property exists for selected edge and select the nodes connected to the edge
+    for (let edge in allEdges) {
+      if (allEdges[edge][selectedProp] && filter['value'].includes((allEdges[edge][selectedProp]).toString())) {
+        selectedNodes.push(allEdges[edge]['from'])
+        selectedNodes.push(allEdges[edge]['to'])
+      }
+    }
+  }
+  selectNodes(selectedNodes)
+}</script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+            
+            
+            
+            
+            
+
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 600px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+             #config {
+                 float: left;
+                 width: 400px;
+                 height: 600px;
+             }
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+            <div id="config"></div>
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "blue", "id": "(0, 0, 0, 0, 0, 0)", "label": "(0, 0, 0, 0, 0, 0)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 1, 0, 1)", "label": "(0, 0, 0, 1, 0, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 1, 1, 0)", "label": "(0, 0, 0, 1, 1, 0)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 1, 1, 1)", "label": "(0, 0, 0, 1, 1, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 2, 0, 2)", "label": "(0, 0, 0, 2, 0, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 2, 1, 1)", "label": "(0, 0, 0, 2, 1, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 2, 1, 2)", "label": "(0, 0, 0, 2, 1, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 2, 2, 0)", "label": "(0, 0, 0, 2, 2, 0)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 2, 2, 1)", "label": "(0, 0, 0, 2, 2, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 3, 0, 3)", "label": "(0, 0, 0, 3, 0, 3)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 3, 1, 2)", "label": "(0, 0, 0, 3, 1, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 3, 1, 3)", "label": "(0, 0, 0, 3, 1, 3)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 3, 2, 1)", "label": "(0, 0, 0, 3, 2, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 3, 2, 2)", "label": "(0, 0, 0, 3, 2, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 3, 3, 0)", "label": "(0, 0, 0, 3, 3, 0)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 3, 3, 1)", "label": "(0, 0, 0, 3, 3, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 0, 4)", "label": "(0, 0, 0, 4, 0, 4)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 1, 3)", "label": "(0, 0, 0, 4, 1, 3)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 1, 4)", "label": "(0, 0, 0, 4, 1, 4)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 2, 2)", "label": "(0, 0, 0, 4, 2, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 2, 3)", "label": "(0, 0, 0, 4, 2, 3)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 3, 1)", "label": "(0, 0, 0, 4, 3, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 3, 2)", "label": "(0, 0, 0, 4, 3, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 0, 5)", "label": "(0, 0, 0, 5, 0, 5)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 4, 0)", "label": "(0, 0, 0, 4, 4, 0)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 4, 4, 1)", "label": "(0, 0, 0, 4, 4, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 1, 4)", "label": "(0, 0, 0, 5, 1, 4)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 1, 5)", "label": "(0, 0, 0, 5, 1, 5)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 2, 3)", "label": "(0, 0, 0, 5, 2, 3)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 2, 4)", "label": "(0, 0, 0, 5, 2, 4)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 3, 2)", "label": "(0, 0, 0, 5, 3, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 3, 3)", "label": "(0, 0, 0, 5, 3, 3)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 4, 1)", "label": "(0, 0, 0, 5, 4, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 5, 4, 2)", "label": "(0, 0, 0, 5, 4, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 0, 6)", "label": "(0, 0, 0, 6, 0, 6)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 1, 5)", "label": "(0, 0, 0, 6, 1, 5)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 1, 6)", "label": "(0, 0, 0, 6, 1, 6)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 2, 4)", "label": "(0, 0, 0, 6, 2, 4)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 2, 5)", "label": "(0, 0, 0, 6, 2, 5)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 3, 3)", "label": "(0, 0, 0, 6, 3, 3)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 3, 4)", "label": "(0, 0, 0, 6, 3, 4)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 4, 2)", "label": "(0, 0, 0, 6, 4, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 4, 3)", "label": "(0, 0, 0, 6, 4, 3)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 6, 5, 1)", "label": "(0, 0, 0, 6, 5, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 8, 0, 0)", "label": "(0, 0, 0, 8, 0, 0)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 8, 0, 1)", "label": "(0, 0, 0, 8, 0, 1)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 8, 0, 2)", "label": "(0, 0, 0, 8, 0, 2)", "shape": "dot"}, {"color": "blue", "id": "(0, 0, 0, 8, 0, 3)", "label": "(0, 0, 0, 8, 0, 3)", "shape": "dot"}]);
+                  edges = new vis.DataSet([{"arrows": "to", "from": "(0, 0, 0, 0, 0, 0)", "title": "Transition 67\nWavenumber: 23.794352", "to": "(0, 0, 0, 1, 0, 1)", "value": 23.794352}, {"arrows": "to", "from": "(0, 0, 0, 0, 0, 0)", "title": "Transition 69\nWavenumber: 37.137119", "to": "(0, 0, 0, 1, 1, 1)", "value": 37.137119}, {"arrows": "to", "from": "(0, 0, 0, 1, 0, 1)", "title": "Transition 68\nWavenumber: 18.577377", "to": "(0, 0, 0, 1, 1, 0)", "value": 18.577377}, {"arrows": "to", "from": "(0, 0, 0, 1, 0, 1)", "title": "Transition 72\nWavenumber: 55.70202", "to": "(0, 0, 0, 2, 1, 2)", "value": 55.70202}, {"arrows": "to", "from": "(0, 0, 0, 1, 1, 0)", "title": "Transition 75\nWavenumber: 92.529886", "to": "(0, 0, 0, 2, 2, 1)", "value": 92.529886}, {"arrows": "to", "from": "(0, 0, 0, 1, 1, 1)", "title": "Transition 70\nWavenumber: 32.953684", "to": "(0, 0, 0, 2, 0, 2)", "value": 32.953684}, {"arrows": "to", "from": "(0, 0, 0, 1, 1, 1)", "title": "Transition 73\nWavenumber: 99.026782", "to": "(0, 0, 0, 2, 2, 0)", "value": 99.026782}, {"arrows": "to", "from": "(0, 0, 0, 2, 0, 2)", "title": "Transition 71\nWavenumber: 25.085121", "to": "(0, 0, 0, 2, 1, 1)", "value": 25.085121}, {"arrows": "to", "from": "(0, 0, 0, 2, 0, 2)", "title": "Transition 80\nWavenumber: 72.187662", "to": "(0, 0, 0, 3, 1, 3)", "value": 72.187662}, {"arrows": "to", "from": "(0, 0, 0, 2, 1, 1)", "title": "Transition 74\nWavenumber: 40.987976", "to": "(0, 0, 0, 2, 2, 0)", "value": 40.987976}, {"arrows": "to", "from": "(0, 0, 0, 2, 1, 1)", "title": "Transition 83\nWavenumber: 111.125474", "to": "(0, 0, 0, 3, 2, 2)", "value": 111.125474}, {"arrows": "to", "from": "(0, 0, 0, 2, 1, 2)", "title": "Transition 76\nWavenumber: 55.405243", "to": "(0, 0, 0, 2, 2, 1)", "value": 55.405243}, {"arrows": "to", "from": "(0, 0, 0, 2, 1, 2)", "title": "Transition 77\nWavenumber: 57.265263", "to": "(0, 0, 0, 3, 0, 3)", "value": 57.265263}, {"arrows": "to", "from": "(0, 0, 0, 2, 1, 2)", "title": "Transition 81\nWavenumber: 132.659973", "to": "(0, 0, 0, 3, 2, 1)", "value": 132.659973}, {"arrows": "to", "from": "(0, 0, 0, 2, 2, 0)", "title": "Transition 89\nWavenumber: 149.055398", "to": "(0, 0, 0, 3, 3, 1)", "value": 149.055398}, {"arrows": "to", "from": "(0, 0, 0, 2, 2, 1)", "title": "Transition 79\nWavenumber: 38.464165", "to": "(0, 0, 0, 3, 1, 2)", "value": 38.464165}, {"arrows": "to", "from": "(0, 0, 0, 2, 2, 1)", "title": "Transition 87\nWavenumber: 150.516912", "to": "(0, 0, 0, 3, 3, 0)", "value": 150.516912}, {"arrows": "to", "from": "(0, 0, 0, 3, 0, 3)", "title": "Transition 78\nWavenumber: 36.604144", "to": "(0, 0, 0, 3, 1, 2)", "value": 36.604144}, {"arrows": "to", "from": "(0, 0, 0, 3, 0, 3)", "title": "Transition 86\nWavenumber: 148.656887", "to": "(0, 0, 0, 3, 3, 0)", "value": 148.656887}, {"arrows": "to", "from": "(0, 0, 0, 3, 0, 3)", "title": "Transition 93\nWavenumber: 88.076714", "to": "(0, 0, 0, 4, 1, 4)", "value": 88.076714}, {"arrows": "to", "from": "(0, 0, 0, 3, 1, 2)", "title": "Transition 82\nWavenumber: 38.79055", "to": "(0, 0, 0, 3, 2, 1)", "value": 38.79055}, {"arrows": "to", "from": "(0, 0, 0, 3, 1, 2)", "title": "Transition 96\nWavenumber: 126.996453", "to": "(0, 0, 0, 4, 2, 3)", "value": 126.996453}, {"arrows": "to", "from": "(0, 0, 0, 3, 1, 3)", "title": "Transition 84\nWavenumber: 64.022934", "to": "(0, 0, 0, 3, 2, 2)", "value": 64.022934}, {"arrows": "to", "from": "(0, 0, 0, 3, 1, 3)", "title": "Transition 90\nWavenumber: 79.774265", "to": "(0, 0, 0, 4, 0, 4)", "value": 79.774265}, {"arrows": "to", "from": "(0, 0, 0, 3, 2, 1)", "title": "Transition 85\nWavenumber: 73.262198", "to": "(0, 0, 0, 3, 3, 0)", "value": 73.262198}, {"arrows": "to", "from": "(0, 0, 0, 3, 2, 2)", "title": "Transition 88\nWavenumber: 78.917907", "to": "(0, 0, 0, 3, 3, 1)", "value": 78.917907}, {"arrows": "to", "from": "(0, 0, 0, 3, 2, 2)", "title": "Transition 91\nWavenumber: 69.195604", "to": "(0, 0, 0, 4, 1, 3)", "value": 69.195604}, {"arrows": "to", "from": "(0, 0, 0, 3, 3, 1)", "title": "Transition 94\nWavenumber: 30.560184", "to": "(0, 0, 0, 4, 2, 2)", "value": 30.560184}, {"arrows": "to", "from": "(0, 0, 0, 4, 0, 4)", "title": "Transition 92\nWavenumber: 53.444272", "to": "(0, 0, 0, 4, 1, 3)", "value": 53.444272}, {"arrows": "to", "from": "(0, 0, 0, 4, 0, 4)", "title": "Transition 99\nWavenumber: 161.789727", "to": "(0, 0, 0, 4, 3, 1)", "value": 161.789727}, {"arrows": "to", "from": "(0, 0, 0, 4, 0, 4)", "title": "Transition 107\nWavenumber: 104.572694", "to": "(0, 0, 0, 5, 1, 5)", "value": 104.572694}, {"arrows": "to", "from": "(0, 0, 0, 4, 1, 3)", "title": "Transition 95\nWavenumber: 40.282486", "to": "(0, 0, 0, 4, 2, 2)", "value": 40.282486}, {"arrows": "to", "from": "(0, 0, 0, 4, 1, 3)", "title": "Transition 112\nWavenumber: 140.71168", "to": "(0, 0, 0, 5, 2, 4)", "value": 140.71168}, {"arrows": "to", "from": "(0, 0, 0, 4, 1, 4)", "title": "Transition 97\nWavenumber: 75.523892", "to": "(0, 0, 0, 4, 2, 3)", "value": 75.523892}, {"arrows": "to", "from": "(0, 0, 0, 4, 1, 4)", "title": "Transition 104\nWavenumber: 100.509505", "to": "(0, 0, 0, 5, 0, 5)", "value": 100.509505}, {"arrows": "to", "from": "(0, 0, 0, 4, 2, 2)", "title": "Transition 98\nWavenumber: 68.062971", "to": "(0, 0, 0, 4, 3, 1)", "value": 68.062971}, {"arrows": "to", "from": "(0, 0, 0, 4, 2, 3)", "title": "Transition 100\nWavenumber: 82.154591", "to": "(0, 0, 0, 4, 3, 2)", "value": 82.154591}, {"arrows": "to", "from": "(0, 0, 0, 4, 2, 3)", "title": "Transition 105\nWavenumber: 99.095216", "to": "(0, 0, 0, 5, 1, 4)", "value": 99.095216}, {"arrows": "to", "from": "(0, 0, 0, 4, 3, 1)", "title": "Transition 102\nWavenumber: 104.291637", "to": "(0, 0, 0, 4, 4, 0)", "value": 104.291637}, {"arrows": "to", "from": "(0, 0, 0, 4, 3, 1)", "title": "Transition 111\nWavenumber: 32.366219", "to": "(0, 0, 0, 5, 2, 4)", "value": 32.366219}, {"arrows": "to", "from": "(0, 0, 0, 4, 3, 2)", "title": "Transition 103\nWavenumber: 105.590791", "to": "(0, 0, 0, 4, 4, 1)", "value": 105.590791}, {"arrows": "to", "from": "(0, 0, 0, 4, 3, 2)", "title": "Transition 108\nWavenumber: 63.993773", "to": "(0, 0, 0, 5, 2, 3)", "value": 63.993773}, {"arrows": "to", "from": "(0, 0, 0, 5, 0, 5)", "title": "Transition 101\nWavenumber: 57.168974", "to": "(0, 0, 0, 4, 3, 2)", "value": 57.168974}, {"arrows": "to", "from": "(0, 0, 0, 5, 0, 5)", "title": "Transition 106\nWavenumber: 74.109609", "to": "(0, 0, 0, 5, 1, 4)", "value": 74.109609}, {"arrows": "to", "from": "(0, 0, 0, 5, 0, 5)", "title": "Transition 120\nWavenumber: 121.904427", "to": "(0, 0, 0, 6, 1, 6)", "value": 121.904427}, {"arrows": "to", "from": "(0, 0, 0, 5, 1, 4)", "title": "Transition 109\nWavenumber: 47.053148", "to": "(0, 0, 0, 5, 2, 3)", "value": 47.053148}, {"arrows": "to", "from": "(0, 0, 0, 5, 1, 4)", "title": "Transition 125\nWavenumber: 153.453854", "to": "(0, 0, 0, 6, 2, 5)", "value": 153.453854}, {"arrows": "to", "from": "(0, 0, 0, 5, 1, 5)", "title": "Transition 110\nWavenumber: 89.583261", "to": "(0, 0, 0, 5, 2, 4)", "value": 89.583261}, {"arrows": "to", "from": "(0, 0, 0, 5, 1, 5)", "title": "Transition 117\nWavenumber: 120.071106", "to": "(0, 0, 0, 6, 0, 6)", "value": 120.071106}, {"arrows": "to", "from": "(0, 0, 0, 5, 2, 3)", "title": "Transition 113\nWavenumber: 62.301378", "to": "(0, 0, 0, 5, 3, 2)", "value": 62.301378}, {"arrows": "to", "from": "(0, 0, 0, 5, 2, 4)", "title": "Transition 114\nWavenumber: 87.759351", "to": "(0, 0, 0, 5, 3, 3)", "value": 87.759351}, {"arrows": "to", "from": "(0, 0, 0, 5, 2, 4)", "title": "Transition 119\nWavenumber: 126.69702", "to": "(0, 0, 0, 6, 1, 5)", "value": 126.69702}, {"arrows": "to", "from": "(0, 0, 0, 5, 3, 2)", "title": "Transition 115\nWavenumber: 101.529096", "to": "(0, 0, 0, 5, 4, 1)", "value": 101.529096}, {"arrows": "to", "from": "(0, 0, 0, 5, 3, 2)", "title": "Transition 124\nWavenumber: 44.099329", "to": "(0, 0, 0, 6, 2, 5)", "value": 44.099329}, {"arrows": "to", "from": "(0, 0, 0, 5, 3, 3)", "title": "Transition 116\nWavenumber: 106.146313", "to": "(0, 0, 0, 5, 4, 2)", "value": 106.146313}, {"arrows": "to", "from": "(0, 0, 0, 5, 3, 3)", "title": "Transition 121\nWavenumber: 98.805377", "to": "(0, 0, 0, 6, 2, 4)", "value": 98.805377}, {"arrows": "to", "from": "(0, 0, 0, 5, 4, 1)", "title": "Transition 129\nWavenumber: 38.637516", "to": "(0, 0, 0, 6, 3, 4)", "value": 38.637516}, {"arrows": "to", "from": "(0, 0, 0, 5, 4, 2)", "title": "Transition 126\nWavenumber: 51.434468", "to": "(0, 0, 0, 6, 3, 3)", "value": 51.434468}, {"arrows": "to", "from": "(0, 0, 0, 6, 0, 6)", "title": "Transition 118\nWavenumber: 96.209176", "to": "(0, 0, 0, 6, 1, 5)", "value": 96.209176}, {"arrows": "to", "from": "(0, 0, 0, 6, 1, 5)", "title": "Transition 122\nWavenumber: 59.867707", "to": "(0, 0, 0, 6, 2, 4)", "value": 59.867707}, {"arrows": "to", "from": "(0, 0, 0, 6, 1, 6)", "title": "Transition 123\nWavenumber: 105.659022", "to": "(0, 0, 0, 6, 2, 5)", "value": 105.659022}, {"arrows": "to", "from": "(0, 0, 0, 6, 2, 4)", "title": "Transition 127\nWavenumber: 58.775413", "to": "(0, 0, 0, 6, 3, 3)", "value": 58.775413}, {"arrows": "to", "from": "(0, 0, 0, 6, 2, 5)", "title": "Transition 128\nWavenumber: 96.067292", "to": "(0, 0, 0, 6, 3, 4)", "value": 96.067292}, {"arrows": "to", "from": "(0, 0, 0, 6, 3, 3)", "title": "Transition 130\nWavenumber: 96.231262", "to": "(0, 0, 0, 6, 4, 2)", "value": 96.231262}, {"arrows": "to", "from": "(0, 0, 0, 6, 3, 4)", "title": "Transition 131\nWavenumber: 107.746075", "to": "(0, 0, 0, 6, 4, 3)", "value": 107.746075}, {"arrows": "to", "from": "(0, 0, 0, 6, 4, 2)", "title": "Transition 132\nWavenumber: 130.852444", "to": "(0, 0, 0, 6, 5, 1)", "value": 130.852444}, {"arrows": "to", "from": "(0, 0, 0, 8, 0, 0)", "title": "Transition 133\nWavenumber: 208.322222", "to": "(0, 0, 0, 8, 0, 1)", "value": 208.322222}, {"arrows": "to", "from": "(0, 0, 0, 8, 0, 1)", "title": "Transition 134\nWavenumber: 214.33333", "to": "(0, 0, 0, 8, 0, 2)", "value": 214.33333}, {"arrows": "to", "from": "(0, 0, 0, 8, 0, 2)", "title": "Transition 135\nWavenumber: 220.356478", "to": "(0, 0, 0, 8, 0, 3)", "value": 220.356478}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": true,
+        "filter": [
+            "physics"
+        ]
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+                  // if this network requires displaying the configure window,
+                  // put it in its div
+                  options.configure["container"] = document.getElementById("config");
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>

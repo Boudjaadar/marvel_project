@@ -1,0 +1,18 @@
+{
+    "quantum_names": [
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "q5",
+        "q6"
+    ],
+    "ground_state_numbers": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+    ]
+}

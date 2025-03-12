@@ -13,4 +13,4 @@ git add .
 git commit -m "$1"
 
 # Récupérer les dernières modifications du dépôt distant
-git pull origin main
+git push origin main
